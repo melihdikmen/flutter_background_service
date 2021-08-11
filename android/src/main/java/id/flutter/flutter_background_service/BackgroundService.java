@@ -99,7 +99,7 @@ public class BackgroundService extends Service implements MethodChannel.MethodCa
     public void onCreate() {
         super.onCreate();
         createNotificationChannel();
-        notificationContent = "Preparing";
+        notificationContent = "Hazırlanıyor";
         updateNotificationInfo();
     }
 
@@ -107,10 +107,14 @@ public class BackgroundService extends Service implements MethodChannel.MethodCa
     public void onDestroy() {
         if (!isManuallyStopped) {
             enqueue(this);
+            stopForeground(true);
         } else {
             setManuallyStopped(true);
         }
+
+     
         stopForeground(true);
+        stopSelf();
         isRunning.set(false);
 
         if (backgroundEngine != null) {
@@ -129,7 +133,7 @@ public class BackgroundService extends Service implements MethodChannel.MethodCa
             CharSequence name = "Background Service";
             String description = "Executing process in background";
 
-            int importance = NotificationManager.IMPORTANCE_DEFAULT;
+            int importance = NotificationManager.IMPORTANCE_LOW;
             NotificationChannel channel = new NotificationChannel("FOREGROUND_DEFAULT", name, importance);
             channel.setDescription(description);
 
@@ -143,9 +147,13 @@ public class BackgroundService extends Service implements MethodChannel.MethodCa
 
             String packageName = getApplicationContext().getPackageName();
             Intent i = getPackageManager().getLaunchIntentForPackage(packageName);
+             Intent stopSelf = new Intent(this, BackgroundService.class);
+             stopSelf.putExtra("stopService",true);
+            PendingIntent pi = PendingIntent.getActivity(BackgroundService.this, 99778, i, PendingIntent.FLAG_CANCEL_CURRENT);
+            PendingIntent pStopSelf = PendingIntent.getService(this, 0, stopSelf,PendingIntent.FLAG_UPDATE_CURRENT);
 
-            PendingIntent pi = PendingIntent.getActivity(BackgroundService.this, 0, i, PendingIntent.FLAG_CANCEL_CURRENT);
             NotificationCompat.Builder mBuilder = new NotificationCompat.Builder(this, "FOREGROUND_DEFAULT")
+                    .addAction(R.drawable.ic_bg_service_small, "Kapat", pStopSelf)
                     .setSmallIcon(R.drawable.ic_bg_service_small)
                     .setAutoCancel(true)
                     .setOngoing(true)
@@ -159,9 +167,18 @@ public class BackgroundService extends Service implements MethodChannel.MethodCa
 
     @Override
     public int onStartCommand(Intent intent, int flags, int startId) {
-        setManuallyStopped(false);
-        enqueue(this);
-        runService();
+        
+        boolean startedFromNotification = intent.getBooleanExtra("stopService",
+                false);
+                if(startedFromNotification){
+                     stopSelf();
+                }else
+                {
+                    setManuallyStopped(true);
+                  enqueue(this);
+                  runService();
+
+                }
 
         return START_STICKY;
     }
